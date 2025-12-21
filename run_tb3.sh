@@ -20,21 +20,16 @@ if [ "$isRunning" -eq 0 ]; then
         --name ${CONTAINER_NAME} \
         --network host \
         --ipc host \
-        --gpus all \
         -e DISPLAY=${DISPLAY} \
         -e QT_X11_NO_MITSHM=1 \
         -e ROS_DOMAIN_ID=30 \
-        -e NVIDIA_VISIBLE_DEVICES=all \
-        -e NVIDIA_DRIVER_CAPABILITIES=all \
-        -e __NV_PRIME_RENDER_OFFLOAD=1 \
-        -e __GLX_VENDOR_LIBRARY_NAME=nvidia \
-        -e __VK_LAYER_NV_optimus=NVIDIA_only \
         -e SDL_AUDIODRIVER=dummy \
         -e ALSOFT_DRIVERS=null \
         -v /tmp/.X11-unix:/tmp/.X11-unix:rw \
         -v /dev/shm:/dev/shm \
         -v ./maps:/root/maps \
         -v ./exercise_teleop:${COLCON_WS}/src/exercise_teleop \
+        -v ./exercise_navigation:${COLCON_WS}/src/exercise_navigation \
         --device=/dev/dri:/dev/dri \
         --entrypoint /bin/bash \
         ${IMAGE_NAME}
@@ -44,3 +39,12 @@ else
     docker exec -it ${CONTAINER_NAME} /bin/bash
 fi
 
+
+# Note: add these flags to enable NVIDIA GPU 
+#       ( NVIDIA Container Toolkit needed )
+#       --gpus all \
+#       -e NVIDIA_VISIBLE_DEVICES=all \
+#       -e NVIDIA_DRIVER_CAPABILITIES=all \
+#       -e __NV_PRIME_RENDER_OFFLOAD=1 \
+#       -e __GLX_VENDOR_LIBRARY_NAME=nvidia \
+#       -e __VK_LAYER_NV_optimus=NVIDIA_only \

@@ -51,7 +51,6 @@ RUN bash -c "source /opt/ros/humble/setup.bash && \
 # Convenience environment
 RUN echo "source /opt/ros/humble/setup.bash" >> /root/.bashrc && \
     echo "source ${COLCON_WS}/install/setup.bash" >> /root/.bashrc && \
-    echo "export ROS_DOMAIN_ID=30" >> /root/.bashrc && \
     echo "export TURTLEBOT3_MODEL=burger" >> /root/.bashrc
 
     

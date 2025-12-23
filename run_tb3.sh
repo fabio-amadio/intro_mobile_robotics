@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 CONTAINER_NAME=turtlebot3
-IMAGE_NAME=turtlebot3-sim:humble-latest
+IMAGE_NAME=ghcr.io/fabio-amadio/turtlebot3-sim:2026
 COLCON_WS=/root/turtlebot3_ws
 
 isRunning=$(docker ps -f name=${CONTAINER_NAME} | grep -c ${CONTAINER_NAME})

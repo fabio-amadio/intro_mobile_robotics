@@ -40,8 +40,8 @@ RUN pip3 install --no-cache-dir pynput
 RUN mkdir -p ${COLCON_WS}/src && \
     cd ${COLCON_WS}/src && \
     git clone -b humble https://github.com/ROBOTIS-GIT/turtlebot3.git && \
-    git clone -b humble https://github.com/ROBOTIS-GIT/turtlebot3_simulations.git && \
-    git clone -b humble https://github.com/ROBOTIS-GIT/turtlebot3_msgs.git
+    git clone -b humble https://github.com/ROBOTIS-GIT/turtlebot3_msgs.git && \
+    git clone -b humble https://github.com/fabio-amadio/turtlebot3_simulations.git
 
 # Build workspace
 RUN bash -c "source /opt/ros/humble/setup.bash && \
@@ -67,7 +67,6 @@ RUN mkdir -p /root/.gazebo/models && \
 
 WORKDIR ${COLCON_WS}
 
-COPY ./exercise_teleop ${COLCON_WS}/src/exercise_teleop/
 COPY ./exercise_navigation ${COLCON_WS}/src/exercise_navigation/
 
 RUN . /opt/ros/${ROS_DISTRO}/setup.sh && colcon build

@@ -13,9 +13,7 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
         (os.path.join('share', package_name, 'launch'), glob('launch/*.launch.py')),
-        (os.path.join('share', package_name, 'param'), glob('param/*')),
         (os.path.join('share', package_name, 'rviz'), glob('rviz/*')),
-        (os.path.join('share', package_name, 'map'), glob('map/*')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -26,8 +24,8 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'planner_node = exercise_navigation.planner_node:main',
-            'local_controller_node = exercise_navigation.local_controller_node:main',
+            'keyboard_teleop = exercise_navigation.keyboard_teleop:main',
+            'bug_nav = exercise_navigation.bug_nav:main',
         ],
     },
 )

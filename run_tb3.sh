@@ -27,8 +27,6 @@ if [ "$isRunning" -eq 0 ]; then
         -e ALSOFT_DRIVERS=null \
         -v /tmp/.X11-unix:/tmp/.X11-unix:rw \
         -v /dev/shm:/dev/shm \
-        -v ./maps:/root/maps \
-        -v ./exercise_teleop:${COLCON_WS}/src/exercise_teleop \
         -v ./exercise_navigation:${COLCON_WS}/src/exercise_navigation \
         --device=/dev/dri:/dev/dri \
         --entrypoint /bin/bash \

@@ -65,4 +65,11 @@ RUN bash -lc "source /opt/ros/${ROS_DISTRO}/setup.bash && \
 RUN mkdir -p /root/.gazebo/models && \
     git clone --depth 1 https://github.com/osrf/gazebo_models.git /root/.gazebo/models              
 
+WORKDIR ${COLCON_WS}
+
+COPY ./exercise_teleop ${COLCON_WS}/src/exercise_teleop/
+COPY ./exercise_navigation ${COLCON_WS}/src/exercise_navigation/
+
+RUN . /opt/ros/${ROS_DISTRO}/setup.sh && colcon build
+
 CMD ["bash"]

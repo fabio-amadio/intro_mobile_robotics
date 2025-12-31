@@ -1,32 +1,6 @@
 #!/usr/bin/env python3
 """
-Very simple ROS 2 keyboard teleop (WASD) with multi-key support.
-
-Controls (hold keys to combine):
-  W = forward
-  S = backward
-  A = turn left
-  D = turn right
-  ESC = quit
-
-Behavior:
-- Publishes /cmd_vel ONLY when something changes due to a key press/release.
-- If you release all keys, it publishes one STOP (0,0).
-
-Why pynput?
-- It can detect key press AND key release, so W+A together works properly.
-- Terminal input (like input() or curses) is not reliable for real multi-key holds.
-
-Install:
-  pip3 install pynput
-
-Run:
-  ros2 run <your_pkg> keyboard_teleop_wasd
-
-Params (optional):
-  - cmd_vel_topic   (default /cmd_vel)
-  - linear_speed    (default 0.25 m/s)
-  - angular_speed   (default 1.2 rad/s)
+ROS 2 keyboard teleop node publishing Twist msg.
 """
 
 import threading
@@ -37,107 +11,134 @@ from geometry_msgs.msg import Twist
 from pynput import keyboard
 
 
-class KeyboardTeleop(Node):
+class SimpleKeyboardTeleop(Node):
     def __init__(self):
-        super().__init__("keyboard_teleop_wasd")
+        super().__init__("simple_keyboard_teleop")
 
+        # Parameters (keep it simple)
         self.declare_parameter("cmd_vel_topic", "/cmd_vel")
         self.declare_parameter("linear_speed", 0.25)
         self.declare_parameter("angular_speed", 1.2)
 
-        self.topic = self.get_parameter("cmd_vel_topic").value
+        self.cmd_vel_topic = self.get_parameter("cmd_vel_topic").value
         self.linear_speed = float(self.get_parameter("linear_speed").value)
         self.angular_speed = float(self.get_parameter("angular_speed").value)
 
-        self.pub = self.create_publisher(Twist, self.topic, 10)
+        self.pub = self.create_publisher(Twist, self.cmd_vel_topic, 10)
 
-        # Which keys are currently held down?
-        # We'll store characters: 'w', 'a', 's', 'd'
-        self.pressed = set()
+        # TODO(Students):
+        # Define the set of allowed keys between:
+        # - ("w", "a", "s", "d") for QWERTY keyboards
+        # - ("z", "q", "s", "d") for AZERTY keyboards
 
-        # Lock = small safety mechanism because pynput runs in another thread.
-        self.lock = threading.Lock()
+        # --- SOLUTION ---
+        self._allowed_keys = ("w", "a", "s", "d")
 
-        # Remember last published command so we only publish when it changes.
-        self.last_vx = None
-        self.last_wz = None
+        # State: which keys are currently held down
+        self._pressed = set()
 
-        self.get_logger().info("Keyboard teleop ready!")
-        self.get_logger().info("Hold keys: W/S forward/back, A/D turn left/right.")
+        # pynput callbacks run in a different thread
+        self._lock = threading.Lock()
 
-    def publish_if_changed(self):
-        vx, wz = self.compute_command()
+        self.get_logger().info("Simple keyboard teleop started.")
+        self.get_logger().info(f"Publishing to: {self.cmd_vel_topic}")
 
-        # Only publish if something changed
-        if self.last_vx == vx and self.last_wz == wz:
-            return
+    def _key_to_char(self, key):
+        """
+        Convert pynput key event to a normalized char in {"w","a","s","d"}.
+        Return None for other keys.
+        """
+        # TODO(Students):
+        # 1) If key is a keyboard.KeyCode and has a .char, normalize to lowercase.
+        # 2) If it's one of the self._allowed_keys, return it.
+        # 3) Otherwise return None.
+        #
+        # Hint:
+        #   isinstance(key, keyboard.KeyCode)
+        #   key.char might be None
 
+        # --- SOLUTION ---
+        if isinstance(key, keyboard.KeyCode) and key.char:
+            ch = key.char.lower()
+            if ch in self._allowed_keys:
+                return ch
+        return None
+
+    def _compute_cmd(self):
+        """
+        Compute (vx, wz) based on which keys are currently pressed.
+
+        Rules:
+        - W forward, S backward. If both pressed -> 0.
+        - A left, D right. If both pressed -> 0.
+        """
+        with self._lock:
+            keys = self._pressed
+
+        # TODO(Students):
+        # Implement the logic to compute vx and wz (floats).
+        # Use self.linear_speed and self.angular_speed.
+
+        vx = 0.0
+        wz = 0.0
+
+        # --- SOLUTION ---
+        if ("w" in keys) and ("s" not in keys):
+            vx = +self.linear_speed
+        elif ("s" in keys) and ("w" not in keys):
+            vx = -self.linear_speed
+        if ("a" in keys) and ("d" not in keys):
+            wz = +self.angular_speed
+        elif ("d" in keys) and ("a" not in keys):
+            wz = -self.angular_speed
+
+        return vx, wz
+
+    def _publish_cmd_vel(self):
+        """
+        Publish Twist msg.
+        """
+        # TODO(Students):
+        # - Compute the desired cmd_vel
+        # - Create a Twist msg, set linear.x and angular.z, then publish.
+
+        # --- SOLUTION ---
+        vx, wz = self._compute_cmd()
         msg = Twist()
         msg.linear.x = vx
         msg.angular.z = wz
         self.pub.publish(msg)
 
-        self.last_vx = vx
-        self.last_wz = wz
-
-    def compute_command(self):
-        # Copy the set safely
-        with self.lock:
-            p = set(self.pressed)
-
-        # Forward/back (W/S). If both held, they cancel.
-        vx = 0.0
-        if "w" in p and "s" not in p:
-            vx = +self.linear_speed
-        elif "s" in p and "w" not in p:
-            vx = -self.linear_speed
-
-        # Turn left/right (A/D). If both held, they cancel.
-        wz = 0.0
-        if "a" in p and "d" not in p:
-            wz = +self.angular_speed
-        elif "d" in p and "a" not in p:
-            wz = -self.angular_speed
-
-        return vx, wz
-
-    def normalize_key(self, key):
-        # Convert a key event into 'w','a','s','d' or return None.
-        if isinstance(key, keyboard.KeyCode) and key.char is not None:
-            ch = key.char.lower()
-            if ch in ["w", "a", "s", "d"]:
-                return ch
-        return None
+    # ---------- Key event handlers ----------
 
     def on_press(self, key):
-        ch = self.normalize_key(key)
+        ch = self._key_to_char(key)
         if ch is None:
             return
 
-        with self.lock:
-            self.pressed.add(ch)
+        with self._lock:
+            self._pressed.add(ch)
 
-        self.publish_if_changed()
+        self._publish_cmd_vel()
 
     def on_release(self, key):
-        ch = self.normalize_key(key)
+        ch = self._key_to_char(key)
         if ch is None:
             return
 
-        with self.lock:
-            if ch in self.pressed:
-                self.pressed.remove(ch)
+        with self._lock:
+            self._pressed.discard(ch)
 
-        self.publish_if_changed()
+        self._publish_cmd_vel()
 
 
 def main():
     rclpy.init()
-    node = KeyboardTeleop()
+    node = SimpleKeyboardTeleop()
 
     listener = keyboard.Listener(
-        on_press=node.on_press, 
-        on_release=node.on_release
+        on_press=node.on_press,
+        on_release=node.on_release,
     )
     listener.start()
 
@@ -146,7 +147,7 @@ def main():
     except KeyboardInterrupt:
         pass
     finally:
-        # Safety stop on shutdown (optional)
+        # Safety stop on shutdown
         try:
             node.pub.publish(Twist())
         except Exception:

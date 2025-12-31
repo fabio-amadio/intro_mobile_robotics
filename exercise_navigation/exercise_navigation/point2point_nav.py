@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Bug-style navigation (Bug2) for ROS 2 (rclpy).
+Point-to-point navigation for ROS 2 (rclpy).
 """
 
 import math
@@ -9,7 +9,6 @@ from rclpy.node import Node
 from rclpy.duration import Duration
 
 from geometry_msgs.msg import Twist, PoseStamped
-from sensor_msgs.msg import LaserScan
 from builtin_interfaces.msg import Time
 import tf2_ros
 
@@ -84,27 +83,21 @@ class BugNavigator(Node):
         self.declare_parameter("world_frame", "odom")
         self.declare_parameter("base_frame", "base_link")
         self.declare_parameter("cmd_vel_topic", "/cmd_vel")
-        self.declare_parameter("scan_topic", "/scan")
         self.declare_parameter("goal_topic", "/goal")
 
         # Behavior parameters
         self.declare_parameter("linear_speed", 0.20)
         self.declare_parameter("angular_speed", 0.6)
         self.declare_parameter("goal_tolerance", 0.05)
-        self.declare_parameter("wall_dist", 0.4)
-        self.declare_parameter("mline_tol", 0.10)
 
         self.linear_speed = self.get_parameter("linear_speed").value
         self.angular_speed = self.get_parameter("angular_speed").value
         self.goal_tolerance = self.get_parameter("goal_tolerance").value
-        self.wall_dist = self.get_parameter("wall_dist").value
-        self.mline_tol = self.get_parameter("mline_tol").value
         self.world_frame = self.get_parameter("world_frame").value
         self.base_frame = self.get_parameter("base_frame").value
 
         # Create topic publishers and subscribers
         self.cmd_pub = self.create_publisher(Twist, self.get_parameter("cmd_vel_topic").value, 10)
-        self.scan_sub = self.create_subscription(LaserScan, self.get_parameter("scan_topic").value, self.on_scan, 10)
         self.goal_sub = self.create_subscription(PoseStamped, self.get_parameter("goal_topic").value, self.on_goal, 10)
 
         # TF
@@ -113,20 +106,17 @@ class BugNavigator(Node):
 
         # State
         self.goal = None
-        self.scan = None
 
-        self.state = "IDLE"          # IDLE, GO_TO_GOAL, WALL_FOLLOW, DONE
+        self.state = "IDLE"          # IDLE, GO_TO_GOAL, DONE
         self.start = None            # (x, y) start point
-        self.hit_point = None        # (x, y) where we first hit the obstacle
-        self.hit_goal_dist = None    # distance to goal at hit point
 
         # Control loop
         self.timer = self.create_timer(0.05, self.step)  # 20 Hz
 
-        self.get_logger().info("BugNavigator ready.")
+        self.get_logger().info("Point-to-Point Nav ready.")
 
     # ----------------------------
-    # ROS callbacks
+    # ROS callback
     # ----------------------------
     def on_goal(self, msg):
         self.goal = msg
@@ -136,13 +126,8 @@ class BugNavigator(Node):
             return
         x, y, _ = pose
         self.start = (x, y)
-        self.hit_point = None
-        self.hit_goal_dist = None
         self.state = "GO_TO_GOAL"
         self.get_logger().info(f"Goal received: ({msg.pose.position.x:.2f}, {msg.pose.position.y:.2f})")
-
-    def on_scan(self, msg):
-        self.scan = msg
 
     # ----------------------------
     # TF pose
@@ -164,55 +149,8 @@ class BugNavigator(Node):
         return (x, y, yaw)
 
     # ----------------------------
-    # LaserScan helper functions
+    # Geometry
     # ----------------------------
-    def min_range_in_sector(self, center_deg, half_width_deg):
-        """Return minimum scan range in an angular sector around center_deg."""
-        if self.scan is None:
-            return float("inf")
-
-        center = math.radians(center_deg)
-        half = math.radians(half_width_deg)
-
-        ang = self.scan.angle_min
-        best = float("inf")
-
-        for r in self.scan.ranges:
-            if center - half <= ang <= center + half:
-                if math.isfinite(r):
-                    best = min(best, r)
-            ang += self.scan.angle_increment
-
-        return best
-
-    def front_dist(self):
-        """Return minimum scan distance in the front sector."""
-        return self.min_range_in_sector(0.0, 30.0)
-
-    def left_dist(self):
-        """Return minimum scan distance in the left sector."""
-        return self.min_range_in_sector(72, 10.0)
-
-    # ----------------------------
-    # Geometry: m-line (start -> goal)
-    # ----------------------------
-    def dist_to_mline(self, x, y):
-        """Perpendicular distance from point (x,y) to the m-line."""
-        if self.start is None or self.goal is None:
-            return float("inf")
-
-        x1, y1 = self.start
-        x2, y2 = self.goal.pose.position.x, self.goal.pose.position.y
-
-        dx = x2 - x1
-        dy = y2 - y1
-
-        denom = math.hypot(dx, dy)
-        if denom < 1e-6:
-            return math.hypot(x - x1, y - y1)
-
-        # Line distance formula
-        return abs(dy * x - dx * y + x2 * y1 - y2 * x1) / denom
 
     def goal_distance(self, x, y):
         gx = self.goal.pose.position.x
@@ -246,21 +184,6 @@ class BugNavigator(Node):
 
         return vx, wz
 
-    def wall_follow_cmd_left(self):
-        front = self.front_dist()
-        left = self.left_dist()
-
-        # --- obstacle in front -> turn right
-        if front < self.wall_dist:
-            return 0.0, -self.angular_speed
-
-        # --- wall too far on the left -> turn left
-        if left > 1.25 * self.wall_dist:
-            return 0.0, +self.angular_speed
-
-        # --- Otherwise: go forward
-        return self.linear_speed, 0.0
-
     # ----------------------------
     # Main loop
     # ----------------------------
@@ -268,7 +191,7 @@ class BugNavigator(Node):
         if self.state in ["IDLE", "DONE"]:
             return
 
-        if self.goal is None or self.scan is None:
+        if self.goal is None:
             return
 
         pose = self.get_pose()
@@ -285,31 +208,7 @@ class BugNavigator(Node):
             return
 
         if self.state == "GO_TO_GOAL":
-            if self.front_dist() < self.wall_dist:
-                # Record hit point
-                self.hit_point = (x, y)
-                self.hit_goal_dist = self.goal_distance(x, y)
-                self.state = "WALL_FOLLOW"
-                self.get_logger().info("Obstacle hit -> switching to WALL_FOLLOW")
-                return
-
             vx, wz = self.go_to_goal_cmd(x, y, yaw)
-            self.publish_cmd(vx, wz)
-            return
-
-        if self.state == "WALL_FOLLOW":
-            # Condition to leave wall (Bug2 idea):
-            # - close to m-line
-            # - closer to goal than at the hit point
-            if self.dist_to_mline(x, y) < self.mline_tol:
-                if self.hit_goal_dist is None or self.goal_distance(x, y) < self.hit_goal_dist * 0.80:
-                    # Try to go to goal again if not blocked
-                    if self.front_dist() > self.wall_dist:
-                        self.state = "GO_TO_GOAL"
-                        self.get_logger().info("Rejoin m-line -> switching to GO_TO_GOAL")
-                        return
-
-            vx, wz = self.wall_follow_cmd_left()
             self.publish_cmd(vx, wz)
             return
 

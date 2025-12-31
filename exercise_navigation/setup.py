@@ -25,6 +25,7 @@ setup(
     entry_points={
         'console_scripts': [
             'keyboard_teleop = exercise_navigation.keyboard_teleop:main',
+            'point2point_nav = exercise_navigation.point2point_nav:main',
             'bug_nav = exercise_navigation.bug_nav:main',
         ],
     },

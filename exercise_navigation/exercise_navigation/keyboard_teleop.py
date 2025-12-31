@@ -3,8 +3,6 @@
 ROS 2 keyboard teleop node publishing Twist msg.
 """
 
-import threading
-
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
@@ -26,116 +24,92 @@ class SimpleKeyboardTeleop(Node):
 
         self.pub = self.create_publisher(Twist, self.cmd_vel_topic, 10)
 
-        # TODO(Students):
-        # Define the set of allowed keys between:
-        # - ("w", "a", "s", "d") for QWERTY keyboards
-        # - ("z", "q", "s", "d") for AZERTY keyboards
+        self.pressed = set()  # to track pressed keys
 
-        # --- SOLUTION ---
-        self._allowed_keys = ("w", "a", "s", "d")
-
-        # State: which keys are currently held down
-        self._pressed = set()
-
-        # pynput callbacks run in a different thread
-        self._lock = threading.Lock()
+        # ------------------------------------------------------------
+        # TODO: define the set of allowed keys between:
+        # - {"w", "a", "s", "d"} for QWERTY keyboards
+        # - {"z", "q", "s", "d"} for AZERTY keyboards
+        self.allowed = {"w", "a", "s", "d"}  # or {"z", "q", "s", "d"}
+        # ------------------------------------------------------------
 
         self.get_logger().info("Simple keyboard teleop started.")
         self.get_logger().info(f"Publishing to: {self.cmd_vel_topic}")
 
-    def _key_to_char(self, key):
+    def publish_cmd_vel(self):
         """
-        Convert pynput key event to a normalized char in {"w","a","s","d"}.
-        Return None for other keys.
+        Compute cmd_vel from pressed keys and publish Twist msg
         """
-        # TODO(Students):
-        # 1) If key is a keyboard.KeyCode and has a .char, normalize to lowercase.
-        # 2) If it's one of the self._allowed_keys, return it.
-        # 3) Otherwise return None.
-        #
-        # Hint:
-        #   isinstance(key, keyboard.KeyCode)
-        #   key.char might be None
-
-        # --- SOLUTION ---
-        if isinstance(key, keyboard.KeyCode) and key.char:
-            ch = key.char.lower()
-            if ch in self._allowed_keys:
-                return ch
-        return None
-
-    def _compute_cmd(self):
-        """
-        Compute (vx, wz) based on which keys are currently pressed.
-
-        Rules:
-        - W forward, S backward. If both pressed -> 0.
-        - A left, D right. If both pressed -> 0.
-        """
-        with self._lock:
-            keys = self._pressed
-
-        # TODO(Students):
-        # Implement the logic to compute vx and wz (floats).
-        # Use self.linear_speed and self.angular_speed.
+        # ------------------------------------------------------------
+        # TODO: compute and publish the proper velocity command
+        # - check self.pressed and decide linear and rotational speed
+        # - create and fill-in a Twist msg
+        # - publish the Twist msg with self.pub
 
         vx = 0.0
         wz = 0.0
 
-        # --- SOLUTION ---
-        if ("w" in keys) and ("s" not in keys):
+        if ("w" in self.pressed) and ("s" not in self.pressed):
             vx = +self.linear_speed
-        elif ("s" in keys) and ("w" not in keys):
+        elif ("s" in self.pressed) and ("w" not in self.pressed):
             vx = -self.linear_speed
-        if ("a" in keys) and ("d" not in keys):
+        if ("a" in self.pressed) and ("d" not in self.pressed):
             wz = +self.angular_speed
-        elif ("d" in keys) and ("a" not in keys):
+        elif ("d" in self.pressed) and ("a" not in self.pressed):
             wz = -self.angular_speed
 
-        return vx, wz
-
-    def _publish_cmd_vel(self):
-        """
-        Publish Twist msg.
-        """
-        # TODO(Students):
-        # - Compute the desired cmd_vel
-        # - Create a Twist msg, set linear.x and angular.z, then publish.
-
-        # --- SOLUTION ---
-        vx, wz = self._compute_cmd()
         msg = Twist()
         msg.linear.x = vx
         msg.angular.z = wz
         self.pub.publish(msg)
+        # ------------------------------------------------------------
 
-    # ---------- Key event handlers ----------
+    def key_to_char(self, key):
+        """
+        Convert pynput key event to a normalized char (if possible).
+        Returns None if key has no char.
+        """
+        if isinstance(key, keyboard.KeyCode) and key.char:
+            ch = key.char.lower()
+            return ch
+        return None
 
     def on_press(self, key):
-        ch = self._key_to_char(key)
-        if ch is None:
+        # ------------------------------------------------------------
+        # TODO: handle pressed key
+        # - Convert key to lowercase char
+        # - If char belongs to self.allowed add it to self.pressed
+        # - Otherwise return
+        ch = self.key_to_char(key)
+        if ch not in self.allowed:
             return
 
-        with self._lock:
-            self._pressed.add(ch)
+        self.pressed.add(ch)
+        # ------------------------------------------------------------
 
-        self._publish_cmd_vel()
+        self.publish_cmd_vel()
 
     def on_release(self, key):
-        ch = self._key_to_char(key)
-        if ch is None:
+        # ------------------------------------------------------------
+        # TODO: handle released key
+        # - Convert key to lowercase char
+        # - If char belongs to self.allowed add it to self.pressed
+        # - Otherwise return
+        ch = self.key_to_char(key)
+        if ch not in self.allowed:
             return
 
-        with self._lock:
-            self._pressed.discard(ch)
+        self.pressed.discard(ch)
+        # ------------------------------------------------------------
 
-        self._publish_cmd_vel()
+        self.publish_cmd_vel()
 
 
 def main():
     rclpy.init()
     node = SimpleKeyboardTeleop()
 
+    # A keyboard listener is a threading.Thread
     listener = keyboard.Listener(
         on_press=node.on_press,
         on_release=node.on_release,

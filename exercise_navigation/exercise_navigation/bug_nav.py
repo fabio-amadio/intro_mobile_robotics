@@ -28,11 +28,7 @@ def angle_wrap(a):
     float
         Equivalent angle in the range [-pi, pi].
     """
-    while a > math.pi:
-        a = a - 2.0 * math.pi
-    while a < -math.pi:
-        a = a + 2.0 * math.pi
-    return a
+    return (a + math.pi) % (2 * math.pi) - math.pi
 
 
 def yaw_from_quat(q):
@@ -103,9 +99,23 @@ class BugNavigator(Node):
         self.base_frame = self.get_parameter("base_frame").value
 
         # Create topic publishers and subscribers
-        self.cmd_pub = self.create_publisher(Twist, self.get_parameter("cmd_vel_topic").value, 10)
-        self.scan_sub = self.create_subscription(LaserScan, self.get_parameter("scan_topic").value, self.on_scan, 10)
-        self.goal_sub = self.create_subscription(PoseStamped, self.get_parameter("goal_topic").value, self.on_goal, 10)
+        self.cmd_pub = self.create_publisher(
+            Twist, 
+            self.get_parameter("cmd_vel_topic").value,
+            10
+        )
+        self.scan_sub = self.create_subscription(
+            LaserScan,
+            self.get_parameter("scan_topic").value,
+            self.on_scan,
+            10
+        )
+        self.goal_sub = self.create_subscription(
+            PoseStamped,
+            self.get_parameter("goal_topic").value,
+            self.on_goal, 
+            10
+        )
 
         # TF
         self.tf_buffer = tf2_ros.Buffer(cache_time=Duration(seconds=10.0))
@@ -115,7 +125,7 @@ class BugNavigator(Node):
         self.goal = None
         self.scan = None
 
-        self.state = "IDLE"          # IDLE, GO_TO_GOAL, WALL_FOLLOW, DONE
+        self.state = "IDLE"          # IDLE, GO_TO_GOAL, WALL_FOLLOW
         self.start = None            # (x, y) start point
         self.hit_point = None        # (x, y) where we first hit the obstacle
         self.hit_goal_dist = None    # distance to goal at hit point
@@ -265,7 +275,7 @@ class BugNavigator(Node):
     # Main loop
     # ----------------------------
     def step(self):
-        if self.state in ["IDLE", "DONE"]:
+        if self.state == "IDLE":
             return
 
         if self.goal is None or self.scan is None:
@@ -280,7 +290,7 @@ class BugNavigator(Node):
         # Check if goal reached
         if self.goal_distance(x, y) < self.goal_tolerance:
             self.stop()
-            self.state = "DONE"
+            self.state = "IDLE"
             self.get_logger().info("Goal reached.")
             return
 

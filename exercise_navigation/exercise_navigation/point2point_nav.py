@@ -110,7 +110,7 @@ class Point2PointNav(Node):
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
 
         # Init internal variables
-        self.goal = None            # PoseStamped
+        self.goal = None            # last goal received - PoseStamped
         self.state = "IDLE"         # either IDLE or GO_TO_GOAL
 
         # Start control loop timer

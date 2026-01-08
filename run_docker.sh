@@ -29,12 +29,12 @@ if [ "$isRunning" -eq 0 ]; then
         -v /dev/shm:/dev/shm \
         -v ./exercise_navigation:${COLCON_WS}/src/exercise_navigation \
         --device=/dev/dri:/dev/dri \
-        --entrypoint /bin/bash \
+        --entrypoint terminator \
         ${IMAGE_NAME}
 
 else
     echo "TurtleBot3 container already running."
-    docker exec -it ${CONTAINER_NAME} /bin/bash
+    docker exec -it ${CONTAINER_NAME} terminator
 fi
 
 

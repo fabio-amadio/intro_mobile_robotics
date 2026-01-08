@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-colcon-common-extensions \
     build-essential \
     git \
+    terminator \
     nano \
     x11-xserver-utils \
     libx11-6 \

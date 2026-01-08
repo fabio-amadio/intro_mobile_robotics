@@ -6,11 +6,17 @@ COLCON_WS=/root/turtlebot3_ws
 
 isRunning=$(docker ps -f name=${CONTAINER_NAME} | grep -c ${CONTAINER_NAME})
 
+is_wsl() {
+    grep -qi microsoft /proc/version
+}
+
 if [ "$isRunning" -eq 0 ]; then
     echo "Starting TurtleBot3 container..."
 
-    # Allow Docker to access X server (Gazebo / RViz)
-    xhost +local:docker >/dev/null
+    # Allow Docker to access X server (skip in WSL)    
+    if ! is_wsl; then
+        xhost +local:docker >/dev/null
+    fi
 
     # Remove stopped container if it exists
     docker rm ${CONTAINER_NAME} >/dev/null 2>&1

@@ -28,7 +28,6 @@ if [ "$isRunning" -eq 0 ]; then
         -v /tmp/.X11-unix:/tmp/.X11-unix:rw \
         -v /dev/shm:/dev/shm \
         -v ./exercise_navigation:${COLCON_WS}/src/exercise_navigation \
-        --device=/dev/dri:/dev/dri \
         --entrypoint terminator \
         ${IMAGE_NAME}
 
